@@ -78,7 +78,7 @@ namespace GRINS
     std::string solid_id_str = "Physics/"+_solid_mechanics+"/enabled_subdomains";
     unsigned int n_solid_subdomains = input.vector_variable_size(solid_id_str);
     if( n_solid_subdomains == 0 )
-      libmesh_error_msg("Error: Must specify "+solid_id_str+" to identify the solid in the IBM physics.\n");
+      libmesh_error_msg("Error: Must specify at least one enabled solid subdomain for Immersed Boundary Physics!");
 
     for( unsigned int i = 0; i < n_solid_subdomains; i++)
       _solid_subdomain_set.insert( input(solid_id_str, -1, i) );
@@ -87,7 +87,7 @@ namespace GRINS
     std::string fluid_id_str = "Physics/"+_fluid_mechanics+"/enabled_subdomains";
     unsigned int n_fluid_subdomains = input.vector_variable_size(fluid_id_str);
     if( n_fluid_subdomains == 0 )
-      libmesh_error_msg("Error: Must specify "+fluid_id_str+" to identify the fluid in the IBM physics.\n");
+      libmesh_error_msg("Error: Must specify at least one enabled fluid subdomain for Immersed Boundary Physics!");
 
     for( unsigned int i = 0; i < n_fluid_subdomains; i++)
       _fluid_subdomain_set.insert( input(fluid_id_str, -1, i) );
