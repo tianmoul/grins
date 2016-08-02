@@ -31,6 +31,7 @@
 #include "grins/multi_component_vector_variable.h"
 #include "grins/common.h"
 #include "grins/solid_mechanics_abstract.h"
+#include "grins/overlapping_fluid_solid_map.h"
 
 //libMesh
 #include "libmesh/fem_context.h"
@@ -96,19 +97,9 @@ namespace GRINS
     //! The subdomain ids for the fluid that are read from input
     std::set<libMesh::subdomain_id_type> _fluid_subdomain_set;
 
-    //! The locator object used to find fluid elements
     libMesh::UniquePtr<libMesh::PointLocatorBase> _point_locator;
 
-    //! Typedef to reduce code verbosity
-    typedef std::map<libMesh::dof_id_type,std::vector<unsigned int> > SolidElemToQpMap;
-
-    //! Typedef to reduce code verbosity
-    /*! \todo Hash map for the first map? */
-    typedef std::map<libMesh::dof_id_type,SolidElemToQpMap> FluidToSolidMap;
-
-    /*! Map from fluid element id to solid element ids that touch the fluid element and the
-        associated solid element quadrature points that lie in the fluid element. */
-    FluidToSolidMap _fluid_id_to_solid_ids_qps;
+    libMesh::UniquePtr<OverlappingFluidSolidMap> _fluid_solid_overlap;
 
     libMesh::UniquePtr<libMesh::FEMContext> _solid_context;
     libMesh::UniquePtr<libMesh::FEMContext> _fluid_context;
