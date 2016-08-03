@@ -89,7 +89,9 @@ namespace GRINSTesting
 
       _es->init();
 
-      GRINS::OverlappingFluidSolidMap mesh_overlap( (*_system), solid_ids, fluid_ids, disp_vars );
+      libMesh::UniquePtr<libMesh::PointLocatorBase> point_locator = _mesh->sub_point_locator();
+
+      GRINS::OverlappingFluidSolidMap mesh_overlap( (*_system), (*point_locator), solid_ids, fluid_ids, disp_vars );
 
       /*
         Overlapping element in the interior: id = 0, node 0 = (0.5,0.5), length is 1 on each edge
