@@ -219,6 +219,8 @@ namespace GRINS
         const std::map<libMesh::dof_id_type,std::vector<unsigned int> > &
           solid_elem_map = fluid_elem_map_it->second;
 
+        std::vector<libMesh::dof_id_type> velocity_dof_indices;
+
         for( std::map<libMesh::dof_id_type,std::vector<unsigned int> >::const_iterator
                solid_elem_map_it = solid_elem_map.begin();
              solid_elem_map_it != solid_elem_map.end();
@@ -279,17 +281,23 @@ namespace GRINS
             if ( this->_disp_vars.dim() == 3 )
               Fws = &_solid_context->get_elem_residual(this->_disp_vars.w());
 
-            unsigned int n_fluid_dofs = fluid_context.get_dof_indices(this->_flow_vars.u()).size();
+            unsigned int n_fluid_dofs = _fluid_context->get_dof_indices(this->_flow_vars.u()).size();
 
-            std::vector<libMesh::dof_id_type> velocity_dof_indices(_flow_vars.dim()*n_fluid_dofs);
+            velocity_dof_indices.clear();
+            velocity_dof_indices.resize(_flow_vars.dim()*n_fluid_dofs);
+
             std::vector<libMesh::dof_id_type>::iterator vdof_start = velocity_dof_indices.begin();
-            velocity_dof_indices.insert( vdof_start,
-                                         fluid_context.get_dof_indices(this->_flow_vars.u()).begin(),
-                                         fluid_context.get_dof_indices(this->_flow_vars.u()).end() );
+            const std::vector<libMesh::dof_id_type>& u_dof_indices =
+              _fluid_context->get_dof_indices(this->_flow_vars.u());
 
-            velocity_dof_indices.insert( vdof_start+n_fluid_dofs,
-                                         fluid_context.get_dof_indices(this->_flow_vars.v()).begin(),
-                                         fluid_context.get_dof_indices(this->_flow_vars.v()).end() );
+            for( unsigned int i = 0; i < u_dof_indices.size(); i++ )
+              velocity_dof_indices[i] = u_dof_indices[i];
+
+            const std::vector<libMesh::dof_id_type>& v_dof_indices =
+              _fluid_context->get_dof_indices(this->_flow_vars.u());
+
+            for( unsigned int i = 0; i < v_dof_indices.size(); i++ )
+              velocity_dof_indices[i+n_fluid_dofs] = v_dof_indices[i];
 
             libMesh::DenseMatrix<libMesh::Number> K;
             libMesh::DenseSubMatrix<libMesh::Number> Kus_uf(K), Kvs_vf(K), Kws_wf(K);
@@ -376,21 +384,20 @@ namespace GRINS
               assembled and homogeneous constraints. */
             if( compute_jacobian )
               {
-                system.get_dof_map().constrain_element_matrix_and_vector
+                system.get_dof_map().constrain_element_matrix
                   ( K,
-                    _solid_context->get_elem_residual(),
-                    _solid_context->get_dof_indices(), false );
+                    _solid_context->get_dof_indices(),
+                    velocity_dof_indices,
+                    false );
 
                 system.matrix->add_matrix( K,
                                            _solid_context->get_dof_indices(),
                                            velocity_dof_indices );
               }
-            else
-              {
-                system.get_dof_map().constrain_element_vector
+
+            system.get_dof_map().constrain_element_vector
                   ( _solid_context->get_elem_residual(),
                     _solid_context->get_dof_indices(), false );
-              }
 
             system.rhs->add_vector( _solid_context->get_elem_residual(),
                                     _solid_context->get_dof_indices() );
