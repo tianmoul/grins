@@ -731,27 +731,17 @@ namespace GRINS
                               for( unsigned int L = 0; L < _disp_vars.dim(); L++ )
                                 {
                                   Kuf_us(i,j) -= F(0,I)*C(I,J,K,L)*F(0,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
+                                  Kuf_vs(i,j) -= F(0,I)*C(I,J,K,L)*F(1,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
                                   Kvf_us(i,j) -= F(1,I)*C(I,J,K,L)*F(0,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
-
-                                  if(this->_flow_vars.dim() == 3)
-                                    Kwf_us(i,j) -= F(2,I)*C(I,J,K,L)*F(0,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
-
-                                  if( this->_disp_vars.dim() >= 2 )
-                                    {
-                                      Kuf_vs(i,j) -= F(0,I)*C(I,J,K,L)*F(1,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
-                                      Kvf_vs(i,j) -= F(1,I)*C(I,J,K,L)*F(1,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
-
-                                      if(this->_flow_vars.dim() == 3)
-                                        Kwf_vs(i,j) -= F(2,I)*C(I,J,K,L)*F(1,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
-                                    }
+                                  Kvf_vs(i,j) -= F(1,I)*C(I,J,K,L)*F(1,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
 
                                   if( this->_disp_vars.dim() == 3 )
                                     {
                                       Kuf_ws(i,j) -= F(0,I)*C(I,J,K,L)*F(2,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
                                       Kvf_ws(i,j) -= F(1,I)*C(I,J,K,L)*F(2,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
-
-                                      if(this->_flow_vars.dim() == 3)
-                                        Kwf_ws(i,j) -= F(2,I)*C(I,J,K,L)*F(2,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
+                                      Kwf_us(i,j) -= F(2,I)*C(I,J,K,L)*F(0,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
+                                      Kwf_vs(i,j) -= F(2,I)*C(I,J,K,L)*F(1,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
+                                      Kwf_ws(i,j) -= F(2,I)*C(I,J,K,L)*F(2,K)*(Ftrans.row(J)*fluid_dphi[i][qp])*solid_dphi[j][solid_qpoint_indices[qp]](L);
                                     }
                                 }
 
