@@ -32,6 +32,7 @@
 #include "grins/common.h"
 #include "grins/solid_mechanics_abstract.h"
 #include "grins/overlapping_fluid_solid_map.h"
+#include "grins/immersed_boundary_augmented_sparsity.h"
 
 //libMesh
 #include "libmesh/fem_context.h"
@@ -100,6 +101,8 @@ namespace GRINS
     libMesh::UniquePtr<libMesh::PointLocatorBase> _point_locator;
 
     libMesh::UniquePtr<OverlappingFluidSolidMap> _fluid_solid_overlap;
+
+    libMesh::UniquePtr<ImmersedBoundaryAugmentedSparsity> _ibm_sparsity;
 
     libMesh::UniquePtr<libMesh::FEMContext> _solid_context;
     libMesh::UniquePtr<libMesh::FEMContext> _fluid_context;
