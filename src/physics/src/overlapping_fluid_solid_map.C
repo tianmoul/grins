@@ -106,31 +106,25 @@ namespace GRINS
 
               // Now add to the solid elem->overlapping fluid elems map, but only if
               // the solid elem belongs to this processor
-              libmesh_assert( solid_elem->valid_processor_id() );
+              {
+                std::map<libMesh::dof_id_type,std::vector<unsigned int> > & fluid_elem_map =
+                  _solid_to_fluid_map[solid_elem->id()];
 
-              if( solid_elem->processor_id() == system.processor_id() )
-                {
-                  std::map<libMesh::dof_id_type,std::vector<unsigned int> > & fluid_elem_map =
-                    _solid_to_fluid_map[solid_elem->id()];
-
-                  // The solid quadrature point that are in this overlapping fluid/solid element pair
-                  std::vector<unsigned int>& solid_qps = fluid_elem_map[fluid_elem->id()];
-                  solid_qps.push_back(qp);
-                }
+                // The solid quadrature point that are in this overlapping fluid/solid element pair
+                std::vector<unsigned int>& solid_qps = fluid_elem_map[fluid_elem->id()];
+                solid_qps.push_back(qp);
+              }
 
               // Now add to the fluid elem->overlapping solid elems map, but only if
               // the fluid elem belongs to this processor
-              libmesh_assert( fluid_elem->valid_processor_id() );
+              {
+                std::map<libMesh::dof_id_type,std::vector<unsigned int> > & solid_elem_map =
+                  _fluid_to_solid_map[fluid_elem->id()];
 
-              if( fluid_elem->processor_id() == system.processor_id() )
-                {
-                  std::map<libMesh::dof_id_type,std::vector<unsigned int> > & solid_elem_map =
-                    _fluid_to_solid_map[fluid_elem->id()];
-
-                  // The solid quadrature point that are in this overlapping fluid/solid element pair
-                  std::vector<unsigned int>& solid_qps = solid_elem_map[solid_elem->id()];
-                  solid_qps.push_back(qp);
-                }
+                // The solid quadrature point that are in this overlapping fluid/solid element pair
+                std::vector<unsigned int>& solid_qps = solid_elem_map[solid_elem->id()];
+                solid_qps.push_back(qp);
+              }
             }
         }
   }
