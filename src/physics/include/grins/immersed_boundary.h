@@ -75,6 +75,14 @@ namespace GRINS
     //! Cache mesh information needed for residual computation
     virtual void preassembly( MultiphysicsSystem & system );
 
+    //! Override to point to solid Physics for displacement initial conditions
+    /*! It would make sense for the user, under the current schema, to put the
+        displacement initial conditions in the solid Physics part of the input
+        file. But, since that Physics doesn't actually get added, only this
+        ImmersedBoundary, then we need to internally point to the solids ics function.*/
+    virtual void init_ics( libMesh::FEMSystem* system,
+                           libMesh::CompositeFunction<libMesh::Number>& all_ics );
+
   private:
 
     //! FE variables for the flow

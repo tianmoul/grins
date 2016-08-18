@@ -118,6 +118,14 @@ namespace GRINS
   }
 
   template<typename SolidMech>
+  void ImmersedBoundary<SolidMech>::init_ics( libMesh::FEMSystem* system,
+                                              libMesh::CompositeFunction<libMesh::Number>& all_ics )
+  {
+    libmesh_assert(this->_solid_mech);
+    _solid_mech->init_ics(system,all_ics);
+  }
+
+  template<typename SolidMech>
   void ImmersedBoundary<SolidMech>::set_time_evolving_vars( libMesh::FEMSystem* system )
   {
     // Tell the system to march velocity and displacements forward in time
