@@ -288,11 +288,10 @@ namespace GRINS
             libMesh::DenseSubVector<libMesh::Number> & Fus =
               _solid_context->get_elem_residual(this->_disp_vars.u());
 
-            libMesh::DenseSubVector<libMesh::Number> * Fvs = NULL;
-            libMesh::DenseSubVector<libMesh::Number> * Fws = NULL;
+            libMesh::DenseSubVector<libMesh::Number> & Fvs =
+              _solid_context->get_elem_residual(this->_disp_vars.v());;
 
-            if ( this->_disp_vars.dim() >= 2 )
-              Fvs = &_solid_context->get_elem_residual(this->_disp_vars.v());
+            libMesh::DenseSubVector<libMesh::Number> * Fws = NULL;
 
             if ( this->_disp_vars.dim() == 3 )
               Fws = &_solid_context->get_elem_residual(this->_disp_vars.w());
@@ -323,9 +322,7 @@ namespace GRINS
                 K.resize( this->_disp_vars.dim()*n_solid_dofs, this->_flow_vars.dim()*n_fluid_dofs );
 
                 Kus_uf.reposition( 0, 0, n_solid_dofs, n_fluid_dofs );
-
-                if( this->_disp_vars.dim() >= 2 )
-                  Kvs_vf.reposition( n_solid_dofs, n_fluid_dofs, n_solid_dofs, n_fluid_dofs );
+                Kvs_vf.reposition( n_solid_dofs, n_fluid_dofs, n_solid_dofs, n_fluid_dofs );
 
                 if( this->_disp_vars.dim() == 3 )
                   if( this->_flow_vars.dim() == 3 )
@@ -346,9 +343,7 @@ namespace GRINS
                 for( unsigned int i = 0; i < n_fluid_dofs; i++ )
                   {
                     Vx += fluid_phi[i][qp]*(fluid_context.get_elem_solution(this->_flow_vars.u()))(i);
-
-                    if ( this->_disp_vars.dim() >= 2 )
-                      Vy += fluid_phi[i][qp]*(fluid_context.get_elem_solution(this->_flow_vars.v()))(i);
+                    Vy += fluid_phi[i][qp]*(fluid_context.get_elem_solution(this->_flow_vars.v()))(i);
 
                     if ( this->_disp_vars.dim() == 3 )
                       Vz += fluid_phi[i][qp]*(fluid_context.get_elem_solution(this->_flow_vars.w()))(i);
@@ -365,9 +360,7 @@ namespace GRINS
                     /*! \todo [PB]: For manifolds, I don't think these are the correct shape
                                     functions because there are missing terms. */
                     Fus(i) += Vx*solid_phi[i][solid_qp_idx]*jac;
-
-                    if ( this->_disp_vars.dim() >= 2 )
-                      (*Fvs)(i) += Vy*solid_phi[i][solid_qp_idx]*jac;
+                    Fvs(i) += Vy*solid_phi[i][solid_qp_idx]*jac;
 
                     if ( this->_disp_vars.dim() ==3 )
                       (*Fws)(i) += Vz*solid_phi[i][solid_qp_idx]*jac;
@@ -381,9 +374,7 @@ namespace GRINS
                               fluid_context.get_elem_solution_derivative();
 
                             Kus_uf(i,j) += diag_value;
-
-                            if ( this->_disp_vars.dim() >= 2 )
-                              Kvs_vf(i,j) += diag_value;
+                            Kvs_vf(i,j) += diag_value;
 
                             if ( this->_disp_vars.dim() == 3 )
                               Kws_wf(i,j) += diag_value;
@@ -455,21 +446,18 @@ namespace GRINS
 
     // Solid residuals
     libMesh::DenseSubVector<libMesh::Number> & Fus = solid_context.get_elem_residual(this->_disp_vars.u());
-    libMesh::DenseSubVector<libMesh::Number> * Fvs = NULL;
+    libMesh::DenseSubVector<libMesh::Number> & Fvs = solid_context.get_elem_residual(this->_disp_vars.v());
     libMesh::DenseSubVector<libMesh::Number> * Fws = NULL;
 
     // Solid Jacobians
-    libMesh::DenseSubMatrix<libMesh::Number>& Kus_us =
+    libMesh::DenseSubMatrix<libMesh::Number> & Kus_us =
       solid_context.get_elem_jacobian(this->_disp_vars.u(),this->_disp_vars.u());
 
-    libMesh::DenseSubMatrix<libMesh::Number>* Kvs_vs = NULL;
-    libMesh::DenseSubMatrix<libMesh::Number>* Kws_ws = NULL;
+    libMesh::DenseSubMatrix<libMesh::Number> & Kvs_vs =
+      solid_context.get_elem_jacobian(this->_disp_vars.v(),this->_disp_vars.v());
 
-    if ( this->_disp_vars.dim() >= 2 )
-      {
-        Fvs = &solid_context.get_elem_residual(this->_disp_vars.v());
-        Kvs_vs = &solid_context.get_elem_jacobian(this->_disp_vars.v(),this->_disp_vars.v());
-      }
+    libMesh::DenseSubMatrix<libMesh::Number> * Kws_ws = NULL;
+
     if ( this->_disp_vars.dim() == 3 )
       {
         Fws = &solid_context.get_elem_residual(this->_disp_vars.w());
@@ -477,8 +465,6 @@ namespace GRINS
       }
 
     const unsigned int n_qpoints = solid_context.get_element_qrule().n_points();
-
-
 
     // First, assemble the velocity coupling into the solid residual
     // We only do this if the time solver is unsteady. Otherwise,
@@ -601,30 +587,17 @@ namespace GRINS
 
             // We need to manually manage the indexing since we're working only on this particular subblock
             Kuf_us.reposition( 0, 0, n_fluid_dofs, n_solid_dofs );
-
+            Kuf_vs.reposition( 0, n_solid_dofs, n_fluid_dofs, n_solid_dofs );
             Kvf_us.reposition( n_fluid_dofs, 0, n_fluid_dofs, n_solid_dofs );
+            Kvf_vs.reposition( n_fluid_dofs, n_solid_dofs, n_fluid_dofs, n_solid_dofs );
 
             if( _flow_vars.dim() == 3 )
-              Kwf_us.reposition( 2*n_fluid_dofs, 0, n_fluid_dofs, n_solid_dofs );
-
-            if( this->_disp_vars.dim() >= 2 )
-              {
-                Kuf_vs.reposition( 0, n_solid_dofs, n_fluid_dofs, n_solid_dofs );
-
-                Kvf_vs.reposition( n_fluid_dofs, n_solid_dofs, n_fluid_dofs, n_solid_dofs );
-
-                if( _flow_vars.dim() == 3 )
-                  Kwf_vs.reposition( 2*n_fluid_dofs, n_solid_dofs, n_fluid_dofs, n_solid_dofs );
-              }
-
-            if( this->_disp_vars.dim() == 3 )
               {
                 Kuf_ws.reposition( 0, 2*n_solid_dofs, n_fluid_dofs, n_solid_dofs );
-
                 Kvf_ws.reposition( n_fluid_dofs, 2*n_solid_dofs, n_fluid_dofs, n_solid_dofs );
-
-                if( _flow_vars.dim() == 3 )
-                  Kwf_ws.reposition( 2*n_fluid_dofs, 2*n_solid_dofs, n_fluid_dofs, n_solid_dofs );
+                Kwf_us.reposition( 2*n_fluid_dofs, 0, n_fluid_dofs, n_solid_dofs );
+                Kwf_vs.reposition( 2*n_fluid_dofs, n_solid_dofs, n_fluid_dofs, n_solid_dofs );
+                Kwf_ws.reposition( 2*n_fluid_dofs, 2*n_solid_dofs, n_fluid_dofs, n_solid_dofs );
               }
           }
 
@@ -703,26 +676,16 @@ namespace GRINS
 
                         Kuf_us(i,j) -= (term1+term3)*factor;
                         Kvf_us(i,j) -= (term1+term3)*factor;
-
-                        if(this->_flow_vars.dim() == 3)
-                          Kwf_us(i,j) -= (term1+term3)*factor;
-
-                        if( this->_disp_vars.dim() >= 2 )
-                          {
-                            Kuf_vs(i,j) -= (term1+term3)*factor;
-                            Kvf_vs(i,j) -= (term1+term3)*factor;
-
-                            if(this->_flow_vars.dim() == 3)
-                              Kwf_vs(i,j) -= (term1+term3)*factor;
-                          }
+                        Kuf_vs(i,j) -= (term1+term3)*factor;
+                        Kvf_vs(i,j) -= (term1+term3)*factor;
 
                         if( this->_disp_vars.dim() == 3 )
                           {
                             Kuf_ws(i,j) -= (term1+term3)*factor;
                             Kvf_ws(i,j) -= (term1+term3)*factor;
-
-                            if(this->_flow_vars.dim() == 3)
-                              Kwf_ws(i,j) -= (term1+term3)*factor;
+                            Kwf_us(i,j) -= (term1+term3)*factor;
+                            Kwf_vs(i,j) -= (term1+term3)*factor;
+                            Kwf_ws(i,j) -= (term1+term3)*factor;
                           }
 
                         for( unsigned int I = 0; I < _disp_vars.dim(); I++ )
