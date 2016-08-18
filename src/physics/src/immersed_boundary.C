@@ -33,7 +33,6 @@
 #include "grins/variable_warehouse.h"
 #include "grins/multiphysics_sys.h"
 
-
 // includes for IBM instantiation
 #include "grins/elastic_membrane.h"
 #include "grins/elastic_cable.h"
@@ -416,12 +415,6 @@ namespace GRINS
 
             system.rhs->add_vector( _solid_context->get_elem_residual(),
                                     _solid_context->get_dof_indices() );
-
-            if( _solid_context->get_elem_residual().l2_norm() > 0.0 )
-              std::cout << "elem " << context.get_elem().id()
-                        << ", solid residual = "
-                        << _solid_context->get_elem_residual()
-                        << std::endl;
 
         } // end loop over solid elem map
       } // end if fluid element has overlapping solid elem
