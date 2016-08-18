@@ -467,53 +467,53 @@ namespace GRINS
     const unsigned int n_qpoints = solid_context.get_element_qrule().n_points();
 
     // First, assemble the velocity coupling into the solid residual
-    // We only do this if the time solver is unsteady. Otherwise,
-    // the solution_rate is not allocated.
+    // Set "default" values for steady case and augment for unsteady case.
+    // Residual is zero, but Jacobian contributions are important in the steady case.
+    libMesh::Point Udot;
+    libMesh::Real solution_rate_derivative = 1.0;
     if( !system.get_time_solver().is_steady() )
+      solution_rate_derivative = solid_context.get_elem_solution_rate_derivative();
+
+    for(unsigned int qp=0; qp != n_qpoints; qp++)
       {
-        for(unsigned int qp=0; qp != n_qpoints; qp++)
+        // Populate solid velocity for the unsteady case. Otherwise it's zero.
+        if( !system.get_time_solver().is_steady() )
           {
             // Velocity of solid at quadrature point.
-            libMesh::Point Udot;
             solid_context.interior_rate(this->_disp_vars.u(), qp, Udot(0));
-            if ( this->_disp_vars.dim() >= 2 )
-              solid_context.interior_rate(this->_disp_vars.v(), qp, Udot(1));
+            solid_context.interior_rate(this->_disp_vars.v(), qp, Udot(1));
+
             if ( this->_disp_vars.dim() == 3 )
               solid_context.interior_rate(this->_disp_vars.w(), qp, Udot(2));
+          }
 
-            // Velocity matching term, loop over solid dofs. These
-            // are minus since the fluid velocity part was positive.
-            for( unsigned int i = 0; i < n_solid_dofs; i++ )
+        // Velocity matching term, loop over solid dofs. These
+        // are minus since the fluid velocity part was positive.
+        for( unsigned int i = 0; i < n_solid_dofs; i++ )
+          {
+            Fus(i) -= Udot(0)*solid_phi[i][qp]*solid_JxW[qp];
+            Fvs(i) -= Udot(1)*solid_phi[i][qp]*solid_JxW[qp];
+
+            if( this->_disp_vars.dim() == 3 )
+              (*Fws)(i) -= Udot(2)*solid_phi[i][qp]*solid_JxW[qp];
+
+            if(compute_jacobian)
               {
-                Fus(i) -= Udot(0)*solid_phi[i][qp]*solid_JxW[qp];
-
-                if( this->_disp_vars.dim() >= 2 )
-                  (*Fvs)(i) -= Udot(1)*solid_phi[i][qp]*solid_JxW[qp];
-
-                if( this->_disp_vars.dim() == 3 )
-                  (*Fws)(i) -= Udot(2)*solid_phi[i][qp]*solid_JxW[qp];
-
-                if(compute_jacobian)
+                for( unsigned int j = 0; j < n_solid_dofs; j++ )
                   {
-                    for( unsigned int j = 0; j < n_solid_dofs; j++ )
-                      {
-                        libMesh::Real diag_value =
-                          solid_phi[j][qp]*solid_phi[i][qp]*solid_JxW[qp]*
-                          solid_context.get_elem_solution_rate_derivative();
+                    libMesh::Real diag_value =
+                      solid_phi[j][qp]*solid_phi[i][qp]*solid_JxW[qp]*solution_rate_derivative;
 
-                        Kus_us(i,j) -= diag_value;
+                    Kus_us(i,j) -= diag_value;
+                    Kvs_vs(i,j) -= diag_value;
 
-                        if ( this->_disp_vars.dim() >= 2 )
-                          (*Kvs_vs)(i,j) -= diag_value;
-
-                        if ( this->_disp_vars.dim() == 3 )
-                          (*Kws_ws)(i,j) -= diag_value;
-                      }
+                    if ( this->_disp_vars.dim() == 3 )
+                      (*Kws_ws)(i,j) -= diag_value;
                   }
+              }
 
-              } // end dof loop
-          } // end qp loop
-      } // end is time_solver steady
+          } // end dof loop
+      } // end qp loop
 
     libMesh::DenseMatrix<libMesh::Number> Kmat;
 
