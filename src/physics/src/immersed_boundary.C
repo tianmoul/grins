@@ -32,6 +32,7 @@
 #include "grins/elasticity_tensor.h"
 #include "grins/variable_warehouse.h"
 #include "grins/multiphysics_sys.h"
+#include "grins/generic_ic_handler.h"
 
 // includes for IBM instantiation
 #include "grins/elastic_membrane.h"
@@ -92,6 +93,8 @@ namespace GRINS
       _fluid_subdomain_set.insert( input(fluid_id_str, -1, i) );
 
     // TODO: Need to check that Mesh has all the fluid and solid subdomain ids
+
+    this->_ic_handler = new GenericICHandler(physics_name, input);
   }
 
   template<typename SolidMech>
