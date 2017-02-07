@@ -58,7 +58,6 @@ namespace GRINS
       libmesh_error_msg("Please supply a theta value between -2*pi and 2*pi");
   }
 
-
   void RayfireMesh::init(const libMesh::MeshBase& mesh_base)
   {
     // consistency check
@@ -74,13 +73,10 @@ namespace GRINS
 
     _mesh = new libMesh::Mesh(mesh_base.comm(),(unsigned char)1);
 
-    unsigned int node_id = 0;
-
-    libMesh::Point* start_point = new libMesh::Point(_origin);
+    libMesh::Point start_point(_origin);
 
     // get first element
-    libMesh::UniquePtr<libMesh::PointLocatorBase> locator = mesh_base.sub_point_locator();
-    const libMesh::Elem* start_elem = (*locator)(_origin);
+    const libMesh::Elem* start_elem = this->get_start_elem(mesh_base);
 
     if (!start_elem)
       libmesh_error_msg("Origin is not on mesh");
@@ -90,9 +86,10 @@ namespace GRINS
     this->check_origin_on_boundary(start_elem);
 
     // add the origin point to the point list
-    _mesh->add_point(*start_point,node_id++);
+    libMesh::Node * start_node = _mesh->add_point(start_point);
+    libMesh::Node * end_node = NULL;
 
-    libMesh::Point* end_point = new libMesh::Point();
+    libMesh::Point end_point;
 
     const libMesh::Elem* next_elem;
     const libMesh::Elem* prev_elem = start_elem;
@@ -104,15 +101,28 @@ namespace GRINS
         next_elem = this->get_next_elem(prev_elem,start_point,end_point);
 
         // add end point as node on the rayfire mesh
-        _mesh->add_point(*end_point,node_id);
+        end_node = _mesh->add_point(end_point);
         libMesh::Elem* elem = _mesh->add_elem(new libMesh::Edge2);
-        elem->set_node(0) = _mesh->node_ptr(node_id-1);
-        elem->set_node(1) = _mesh->node_ptr(node_id++);
+        elem->set_node(0) = start_node;
+        elem->set_node(1) = end_node;
+        
+        // warn if rayfire elem is shorter than TOLERANCE
+        if ( (start_point-end_point).norm() < libMesh::TOLERANCE)
+          {
+            std::stringstream ss;
+            ss  <<"********\n"
+                <<"WARNING\n"
+                <<"Detected rayfire element shorter than TOLERANCE\n"
+                <<"Element ID: " <<prev_elem->id() <<", rayfire element length: " <<(start_point-end_point).norm();
+
+            libmesh_warning(ss.str());
+          }
 
         // add new rayfire elem to the map
         _elem_id_map[prev_elem->id()] = elem;
 
         start_point = end_point;
+        start_node = end_node;
         prev_elem = next_elem;
       } while(next_elem);
 
@@ -122,6 +132,17 @@ namespace GRINS
   const libMesh::Elem* RayfireMesh::map_to_rayfire_elem(const libMesh::dof_id_type elem_id)
   {
     return this->get_rayfire_elem(elem_id);
+  }
+
+
+  void RayfireMesh::elem_ids_in_rayfire(std::vector<libMesh::dof_id_type>& id_vector)
+  {
+    std::map<libMesh::dof_id_type,libMesh::Elem*>::iterator it = _elem_id_map.begin();
+    for(; it != _elem_id_map.end(); it++)
+      {
+        if (it->second->active())
+          id_vector.push_back(it->first);
+      }
   }
 
 
@@ -168,6 +189,7 @@ namespace GRINS
     // coarsen the elements that need it
     for (unsigned int i=0; i<elems_to_coarsen.size(); i++)
       this->coarsen(elems_to_coarsen[i]);
+
   }
 
 
@@ -175,6 +197,8 @@ namespace GRINS
 
   void RayfireMesh::check_origin_on_boundary(const libMesh::Elem* start_elem)
   {
+    libmesh_assert(start_elem);
+
     // first, make sure the elem is on a boundary
     if ( !(start_elem->on_boundary()) )
       libmesh_error_msg("The supplied origin point is not on a boundary element");
@@ -185,8 +209,8 @@ namespace GRINS
 
     for (unsigned int s=0; s<start_elem->n_sides(); s++)
       {
-        // neighbor() returns NULL on boundary elems
-        if ( start_elem->neighbor(s) )
+        // neighbor_ptr() returns NULL on boundary elems
+        if ( start_elem->neighbor_ptr(s) )
           continue;
 
         // we found a boundary elem, so make an edge and see if it contains the origin
@@ -196,6 +220,39 @@ namespace GRINS
 
     if (!valid)
       libmesh_error_msg("The supplied origin point is not on the boundary of the starting element");
+  }
+
+
+  const libMesh::Elem* RayfireMesh::get_start_elem(const libMesh::MeshBase& mesh_base)
+  {
+    const libMesh::Elem* start_elem = NULL;
+
+    libMesh::UniquePtr<libMesh::PointLocatorBase> locator = mesh_base.sub_point_locator();
+    const libMesh::Elem* elem = (*locator)(_origin);
+
+    // elem would be NULL if origin is not on mesh
+    if (elem)
+      {
+        if (this->rayfire_in_elem(_origin,elem))
+          start_elem = elem;
+        else
+          {
+            for (unsigned int i=0; i<elem->n_neighbors(); i++)
+              {
+                const libMesh::Elem* neighbor_elem = elem->neighbor_ptr(i);
+                if (!neighbor_elem)
+                  continue;
+
+                if (this->rayfire_in_elem(_origin,neighbor_elem))
+                  {
+                    start_elem = neighbor_elem;
+                    break;
+                  }
+              }
+          }
+      }
+
+    return start_elem; // might be NULL if _origin is not on mesh
   }
 
 
@@ -214,23 +271,28 @@ namespace GRINS
   }
 
 
-  const libMesh::Elem* RayfireMesh::get_next_elem(const libMesh::Elem* cur_elem, libMesh::Point* start_point, libMesh::Point* next_point)
+  const libMesh::Elem* RayfireMesh::get_next_elem(const libMesh::Elem* cur_elem, libMesh::Point& start_point, libMesh::Point& next_point, bool same_parent)
   {
-    libMesh::Point* intersection_point = new libMesh::Point();
+    libmesh_assert(cur_elem);
+
+    libMesh::Point intersection_point;
 
     // loop over all sides of the elem and check each one for intersection
     for (unsigned int s=0; s<cur_elem->n_sides(); s++)
       {
         const libMesh::UniquePtr<libMesh::Elem> edge_elem = cur_elem->build_edge(s);
-        if (edge_elem->contains_point(*start_point))
+        
+        // Using the default tol can cause a false positive when start_point is near a node,
+        // causing this loop to skip over an otherwise valid edge to check
+        if (edge_elem->contains_point(start_point,libMesh::TOLERANCE*0.1))
           continue;
 
-        bool converged = this->newton_solve_intersection(*start_point,edge_elem.get(),intersection_point);
+        bool converged = this->newton_solve_intersection(start_point,edge_elem.get(),intersection_point);
 
         if (converged)
           {
-            if ( this->check_valid_point(*intersection_point,*start_point,*edge_elem,next_point) )
-              return this->get_correct_neighbor(*intersection_point,cur_elem,s);
+            if ( this->check_valid_point(intersection_point,start_point,*edge_elem,next_point) )
+              return this->get_correct_neighbor(intersection_point,cur_elem,s,same_parent);
           }
         else
           continue;
@@ -241,7 +303,7 @@ namespace GRINS
   }
 
 
-  bool RayfireMesh::check_valid_point(libMesh::Point& intersection_point, libMesh::Point& start_point, libMesh::Elem& edge_elem, libMesh::Point* next_point)
+  bool RayfireMesh::check_valid_point(libMesh::Point& intersection_point, libMesh::Point& start_point, libMesh::Elem& edge_elem, libMesh::Point& next_point)
   {
     bool is_not_start = !(intersection_point.absolute_fuzzy_equals(start_point));
     bool is_on_edge = edge_elem.contains_point(intersection_point);
@@ -250,32 +312,88 @@ namespace GRINS
 
     if ( is_valid )
       {
-        (*next_point)(0) = intersection_point(0);
-        (*next_point)(1) = intersection_point(1);
+        next_point(0) = intersection_point(0);
+        next_point(1) = intersection_point(1);
       }
 
     return is_valid;
   }
 
 
-  const libMesh::Elem* RayfireMesh::get_correct_neighbor(libMesh::Point& end_point, const libMesh::Elem* cur_elem, unsigned int side)
+  bool RayfireMesh::rayfire_in_elem(const libMesh::Point& end_point, const libMesh::Elem* elem)
   {
-    // check if side is a boundary
-    if( !(cur_elem->neighbor(side)) )
-      return NULL;
+    libmesh_assert(elem);
+
+    // move a little bit along the rayfire and see if we are still in the elem
+    // need to move more than TOLERANCE to avoid false positive on contains_point()
+    libMesh::Real L = 2*libMesh::TOLERANCE;
+
+    // If the elem is too small, need to shorten L so we stay within the elem
+    if ( elem->hmin() < libMesh::TOLERANCE )
+        L = elem->hmin() * 0.1;
+
+    // parametric representation of rayfire line
+    libMesh::Real x = end_point(0) + L*std::cos(_theta);
+    libMesh::Real y = end_point(1) + L*std::sin(_theta);
+
+    return elem->contains_point(libMesh::Point(x,y));
+  }
+
+
+  const libMesh::Elem* RayfireMesh::get_correct_neighbor(libMesh::Point& end_point, const libMesh::Elem* cur_elem, unsigned int side, bool same_parent)
+  {
+    libmesh_assert(cur_elem);
 
     // check if the intersection point is a vertex
     bool is_vertex = false;
+    libMesh::Node * vertex = NULL;
     for(unsigned int n=0; n<cur_elem->n_nodes(); n++)
-      is_vertex |= (cur_elem->get_node(n))->absolute_fuzzy_equals(end_point);
+      {
+        if ((cur_elem->get_node(n))->absolute_fuzzy_equals(end_point))
+          {
+            is_vertex = true;
+            vertex = cur_elem->get_node(n);
+            break;
+          }
+      }
 
     if (is_vertex)
       {
         // rayfire goes through vertex
 
-        // get all elems that share this vertex
+        // check elem neighbors first
+        for (unsigned int s=0; s<cur_elem->n_sides(); s++)
+          {
+            libMesh::UniquePtr<libMesh::Elem> side_elem = cur_elem->build_side(s);
+            if (side_elem->contains_point(end_point))
+              {
+                const libMesh::Elem * neighbor = cur_elem->neighbor_ptr(s);
+                if (!neighbor)
+                  continue;
+
+                if (same_parent)
+                  {
+                    if (neighbor->parent())
+                      {
+                        if (neighbor->parent()->id() != cur_elem->parent()->id())
+                          continue;
+                        else
+                          if (this->rayfire_in_elem(end_point,neighbor))
+                            return neighbor;
+                      }
+                    else
+                      continue;
+                  }
+                else
+                  if (this->rayfire_in_elem(end_point,neighbor))
+                    return neighbor;
+              }
+          }
+
+        // next elem is not a neighbor,
+        // so get all elems that share this vertex
         std::set<const libMesh::Elem*> elem_set;
-        cur_elem->find_point_neighbors(end_point,elem_set);
+        cur_elem->find_point_neighbors(*vertex,elem_set);
         std::set<const libMesh::Elem *>::const_iterator       it  = elem_set.begin();
         const std::set<const libMesh::Elem *>::const_iterator end = elem_set.end();
 
@@ -287,33 +405,29 @@ namespace GRINS
             if (elem == cur_elem) // skip the current elem
               continue;
 
-            // move a little bit along the rayfire
-            // and see if we are in the elem
-            libMesh::Real L = elem->hmin();
-            L *= 0.1;
-
-            // parametric representation of rayfire line
-            libMesh::Real x = end_point(0) + L*std::cos(_theta);
-            libMesh::Real y = end_point(1) + L*std::sin(_theta);
-
-            if ( elem->contains_point(libMesh::Point(x,y)) )
+            if (this->rayfire_in_elem(end_point,elem))
               return elem;
           }
 
       }
     else
       {
-        // not a vertex, so just get the elem on that side
-        return cur_elem->neighbor(side);
+        // check if side is a boundary
+        if( !(cur_elem->neighbor_ptr(side)) )
+          return NULL;
+
+        // not a vertex or boundary, so just get the elem on that side
+        return cur_elem->neighbor_ptr(side);
       }
 
-    libmesh_error_msg("We shouldn't be here...");
     return NULL;
   }
 
 
-  bool RayfireMesh::newton_solve_intersection(libMesh::Point& initial_point, const libMesh::Elem* edge_elem, libMesh::Point* intersection_point)
+  bool RayfireMesh::newton_solve_intersection(libMesh::Point& initial_point, const libMesh::Elem* edge_elem, libMesh::Point& intersection_point)
   {
+    libmesh_assert(edge_elem);
+
     unsigned int iter_max = 20; // max iterations
 
     // the number of shape functions needed for the edge_elem
@@ -373,8 +487,8 @@ namespace GRINS
         if(std::abs(d_xi) < libMesh::TOLERANCE)
           {
             // convergence
-            (*intersection_point)(0) = X;
-            (*intersection_point)(1) = Y;
+            intersection_point(0) = X;
+            intersection_point(1) = Y;
             return true;
           }
         else
@@ -389,6 +503,9 @@ namespace GRINS
 
   void RayfireMesh::refine(const libMesh::Elem* main_elem, libMesh::Elem* rayfire_elem)
   {
+    libmesh_assert(main_elem);
+    libmesh_assert(rayfire_elem);
+
     libmesh_assert_equal_to(main_elem->refinement_flag(),libMesh::Elem::RefinementState::INACTIVE);
 
     // these nodes cannot change
@@ -399,21 +516,31 @@ namespace GRINS
     rayfire_elem->set_refinement_flag(libMesh::Elem::RefinementState::INACTIVE);
 
     // find which child elem we start with
-    libMesh::dof_id_type start_child = -1;
+    libMesh::dof_id_type start_child = libMesh::invalid_uint;
     for(unsigned int i=0; i<main_elem->n_children(); i++)
       {
         if ( (main_elem->child(i))->contains_point(*start_node) )
           {
-            // move a little bit along the rayfire
-            // and see if we are in the elem
-            libMesh::Real L = main_elem->child(i)->hmin();
-            L *= 0.1;
+            // check if the start point is a vertex
+            bool is_vertex = false;
+            for(unsigned int n=0; n<main_elem->child(i)->n_nodes(); n++)
+              {
+                if ((main_elem->child(i)->get_node(n))->absolute_fuzzy_equals(*start_node))
+                  {
+                    is_vertex = true;
+                    break;
+                  }
+              }
 
-            // parametric representation of rayfire line
-            libMesh::Real x = (*start_node)(0) + L*std::cos(_theta);
-            libMesh::Real y = (*start_node)(1) + L*std::sin(_theta);
-
-            if (main_elem->child(i)->contains_point(libMesh::Point(x,y)))
+            if (is_vertex)
+              {
+                if ( this->rayfire_in_elem(*start_node, main_elem->child(i)) )
+                  {
+                    start_child = i;
+                    break;
+                  }
+              }
+            else
               {
                 start_child = i;
                 break;
@@ -421,10 +548,13 @@ namespace GRINS
           }
       }
 
+    // make sure we found a starting child elem
+    libmesh_assert_not_equal_to(start_child,libMesh::invalid_uint);
+
     // we found the starting element, so perform the rayfire
     // until we reach the stored end_node
-    libMesh::Point* start_point = start_node;
-    libMesh::Point* end_point = new libMesh::Point();
+    libMesh::Point start_point = *start_node;
+    libMesh::Point end_point;
 
     const libMesh::Elem* next_elem;
     const libMesh::Elem* prev_elem = main_elem->child(start_child);
@@ -434,24 +564,34 @@ namespace GRINS
     // break this
     libmesh_assert_equal_to( prev_elem->refinement_flag(), libMesh::Elem::RefinementState::JUST_REFINED );
 
-    // There are _mesh->n_nodes()-1 number of nodes already in _mesh
-    // so use n_nodes() as the ID of the next node to add
-    unsigned int end_node_id = _mesh->n_nodes();
-
-    unsigned int start_node_id = start_node->id();
-
-    // calculate the end point and
-    // get the second elem in the rayfire
-    next_elem = this->get_next_elem(prev_elem,start_point,end_point);
+    libMesh::Node * prev_node = start_node;
+    libMesh::Node * new_node = NULL;
 
     // iterate until we reach the stored end_node
-    while(!(end_point->absolute_fuzzy_equals(*end_node)))
+    do
       {
+        next_elem = this->get_next_elem(prev_elem,start_point,end_point,true);
+
         // add end point as node on the rayfire mesh
-        _mesh->add_point(*end_point,end_node_id);
+        new_node = _mesh->add_point(end_point);
         libMesh::Elem* elem = _mesh->add_elem(new libMesh::Edge2);
-        elem->set_node(0) = _mesh->node_ptr(start_node_id);
-        elem->set_node(1) = _mesh->node_ptr(end_node_id);
+
+        elem->set_node(0) = prev_node;
+        elem->set_node(1) = new_node;
+
+        libmesh_assert_less( (*(elem->get_node(0))-_origin).norm(),  (*(elem->get_node(1))-_origin).norm());
+        
+        // warn if rayfire elem is shorter than TOLERANCE
+        if ( (start_point-end_point).norm() < libMesh::TOLERANCE)
+          {
+            std::stringstream ss;
+            ss  <<"********\n"
+                <<"WARNING\n"
+                <<"Detected rayfire element shorter than TOLERANCE on refinement\n"
+                <<"Element ID: " <<prev_elem->id() <<", rayfire element length: " <<(start_point-end_point).norm();
+
+            libmesh_warning(ss.str());
+          }
 
         // set rayfire_elem as the parent of this new elem
         // in case it gets coarsened
@@ -461,34 +601,24 @@ namespace GRINS
         _elem_id_map[prev_elem->id()] = elem;
         start_point = end_point;
         prev_elem = next_elem;
-        start_node_id = end_node_id++;
+        prev_node = new_node;
 
-        next_elem = this->get_next_elem(prev_elem,start_point,end_point);
-      }
+      } while(!(new_node->absolute_fuzzy_equals(*end_node)));
 
-    // need to manually assign the end_node to the final edge elem
-    libMesh::Elem* elem = _mesh->add_elem(new libMesh::Edge2);
-    elem->set_node(0) = _mesh->node_ptr(start_node_id);
-    elem->set_node(1) = _mesh->node_ptr(end_node->id());
-
-    elem->set_parent(rayfire_elem);
-
-    // add new rayfire elem to the map
-    _elem_id_map[prev_elem->id()] = elem;
   }
 
 
   void RayfireMesh::coarsen(const libMesh::Elem* child_elem)
   {
+    libmesh_assert(child_elem);
+
     if (this->get_rayfire_elem(child_elem->id()))
       {
         const libMesh::Elem* parent_elem = child_elem->parent();
         libmesh_assert(parent_elem);
 
-        const libMesh::Node* start_node;
-        const libMesh::Node* end_node;
-
-        bool initial_nodes = false;
+        const libMesh::Node* start_node = NULL;
+        const libMesh::Node* end_node = NULL;
 
         for (unsigned int c=0; c<parent_elem->n_children(); c++)
           {
@@ -496,11 +626,10 @@ namespace GRINS
 
             if (rayfire_child)
               {
-                if (!initial_nodes)
+                if (!start_node)
                   {
                     start_node = rayfire_child->get_node(0);
                     end_node = rayfire_child->get_node(1);
-                    initial_nodes = true;
                   }
                 else
                   {
@@ -515,14 +644,21 @@ namespace GRINS
               }
           } // for c
 
+        // make sure we found nodes
+        libmesh_assert(start_node);
+        libmesh_assert(end_node);
+
         // add a new rayfire elem
         libMesh::Elem* elem = _mesh->add_elem(new libMesh::Edge2);
         elem->set_node(0) = _mesh->node_ptr(start_node->id());
         elem->set_node(1) = _mesh->node_ptr(end_node->id());
 
+        libmesh_assert_less( (*(elem->get_node(0))-_origin).norm(),  (*(elem->get_node(1))-_origin).norm());
+
         // add new rayfire elem to the map
         _elem_id_map[parent_elem->id()] = elem;
       }
+
   }
 
 } //namespace GRINS

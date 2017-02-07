@@ -103,6 +103,11 @@ namespace GRINS
     const libMesh::Elem* map_to_rayfire_elem(const libMesh::dof_id_type elem_id);
 
     /*!
+    Returns a vector of elem IDs that are currently along the rayfire
+    */
+    void elem_ids_in_rayfire(std::vector<libMesh::dof_id_type>& id_vector);
+
+    /*!
     Checks for refined and coarsened main mesh elements along the rayfire path.
     They are then passed to refine() and coarsen(), respectively, to update the rayfire mesh.
 
@@ -119,7 +124,7 @@ namespace GRINS
     const unsigned int _dim;
 
     //! Origin point
-    libMesh::Point& _origin;
+    libMesh::Point _origin;
 
     //! Rayfire Spherical polar angle (in radians)
     libMesh::Real   _theta;
@@ -152,16 +157,26 @@ namespace GRINS
     @return Elem* if intersection is found
     @return NULL  if no intersection point found (i.e. start_point is on a boundary)
     */
-    const libMesh::Elem* get_next_elem(const libMesh::Elem* cur_elem, libMesh::Point* start_point, libMesh::Point* end_point);
+    const libMesh::Elem* get_next_elem(const libMesh::Elem* cur_elem, libMesh::Point& start_point, libMesh::Point& end_point, bool same_parent = false);
 
     //! Ensure the calculated intersection point is on the edge_elem and is not the start_point
-    bool check_valid_point(libMesh::Point& intersection_point, libMesh::Point& start_point, libMesh::Elem& edge_elem, libMesh::Point* next_point);
+    bool check_valid_point(libMesh::Point& intersection_point, libMesh::Point& start_point, libMesh::Elem& edge_elem, libMesh::Point& next_point);
 
     //! Knowing the end_point, get the appropraite next elem along the path
-    const libMesh::Elem* get_correct_neighbor(libMesh::Point& end_point, const libMesh::Elem* cur_elem, unsigned int side);
+    const libMesh::Elem* get_correct_neighbor(libMesh::Point& end_point, const libMesh::Elem* cur_elem, unsigned int side, bool same_parent);
 
     //! Ensure the supplied origin is on a boundary of the mesh
     void check_origin_on_boundary(const libMesh::Elem* start_elem);
+
+    //! Get the correct starting elem corresponding to _origin
+    /*!
+    @return NULL Origin is not on the mesh
+    @return Elem* First elem on the rayfire
+    */
+    const libMesh::Elem* get_start_elem(const libMesh::MeshBase& mesh_base);
+
+    //! Walks a short distance along the rayfire and checks if elem contains that point
+    bool rayfire_in_elem(const libMesh::Point& end_point, const libMesh::Elem* elem);
 
     //! Iterative solver for calculating the intersection point of the rayfire on the side of an elem
     /*!
@@ -200,7 +215,7 @@ namespace GRINS
     @param[out] intersection_point The calculated intersection point (only set if convergence is achieved)
     @return Whether or not the solver converged before hitting the iteration limit
     */
-    bool newton_solve_intersection(libMesh::Point& initial_point, const libMesh::Elem* edge_elem, libMesh::Point* intersection_point);
+    bool newton_solve_intersection(libMesh::Point& initial_point, const libMesh::Elem* edge_elem, libMesh::Point& intersection_point);
 
     //! Refinement of a rayfire element whose main mesh counterpart was refined
     void refine(const libMesh::Elem* main_elem, libMesh::Elem* rayfire_elem);

@@ -26,8 +26,10 @@
 
 #ifdef GRINS_HAVE_CPPUNIT
 
+#include <libmesh/ignore_warnings.h>
 #include <cppunit/extensions/HelperMacros.h>
 #include <cppunit/TestCase.h>
+#include <libmesh/restore_warnings.h>
 
 #include "test_comm.h"
 #include "grins_test_paths.h"
@@ -46,6 +48,9 @@
 #include "libmesh/fe_interface.h"
 #include "libmesh/serial_mesh.h"
 
+// Ignore warnings from auto_ptr in CPPUNIT_TEST_SUITE_END()
+#include <libmesh/ignore_warnings.h>
+
 namespace GRINSTesting
 {
   class RayfireTest : public CppUnit::TestCase
@@ -62,6 +67,7 @@ namespace GRINSTesting
     CPPUNIT_TEST( test_quad4_2D );
     CPPUNIT_TEST( test_quad9_2D );
     CPPUNIT_TEST( fire_through_vertex );
+    CPPUNIT_TEST( origin_between_elems );
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -95,7 +101,6 @@ namespace GRINSTesting
       run_test_on_all_point_combinations(pts,mesh);
 
     }
-
 
     void quad9_all_sides()
     {
@@ -254,8 +259,6 @@ namespace GRINSTesting
       this->run_test(origin,-1.0,calc_end_node_large_neg_angle,9,0,"quad9",2);
     }
 
-
-
     void fire_through_vertex()
     {
       libMesh::Point origin = libMesh::Point(0.0,0.0);
@@ -269,6 +272,15 @@ namespace GRINSTesting
       this->run_test(origin,45.0*GRINS::Constants::pi/180.0,calc_end_node_straight,9,8,"quad9",2);
     }
 
+    void origin_between_elems()
+    {
+      libMesh::Point origin = libMesh::Point(0.0,1.0);
+      libMesh::Node calc_end_node = libMesh::Node(3.0,3.0);
+      libMesh::Real theta = calc_theta(origin,calc_end_node);
+
+      this->run_test(origin,theta,calc_end_node,9,8,"quad4",2);
+      this->run_test(origin,theta,calc_end_node,9,8,"quad9",2);
+    }
 
 
   private:

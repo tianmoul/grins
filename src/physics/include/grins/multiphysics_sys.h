@@ -39,7 +39,9 @@
 
 #ifdef GRINS_HAVE_GRVY
 // GRVY timers
+#include "libmesh/ignore_warnings.h" // avoid auto_ptr deprecated warnings
 #include "grvy.h"
+#include "libmesh/restore_warnings.h"
 #endif
 
 // libMesh forward declartions
@@ -226,6 +228,9 @@ namespace GRINS
         Variables it applies to. We use SharedPtr here because
         libMesh::UniquePtr may still actually be an AutoPtr. */
     std::vector<SharedPtr<NeumannBCContainer> > _neumann_bcs;
+
+    //! Constraint application object
+    libMesh::UniquePtr<libMesh::System::Constraint> _constraint;
 
 #ifdef GRINS_USE_GRVY_TIMERS
     GRVY::GRVY_Timer_Class* _timer;

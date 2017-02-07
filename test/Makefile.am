@@ -98,7 +98,7 @@ check_PROGRAMS += 3d_low_mach_jacobians_xy
 check_PROGRAMS += 3d_low_mach_jacobians_xz
 check_PROGRAMS += 3d_low_mach_jacobians_yz
 check_PROGRAMS += generic_solution_regression
-
+check_PROGRAMS += regression_testing_app
 
 # AMR Tests
 check_PROGRAMS += generic_amr_testing_app
@@ -113,6 +113,9 @@ unit_driver_SOURCES = unit/unit_driver.C \
                       unit/rayfire_test.C \
                       unit/rayfireAMR_test.C \
                       unit/overlapping_fluid_solid_mesh.C
+                      unit/integrated_function_test.C \
+                      unit/hitran_test.C \
+                      unit/spectroscopic_absorption_test.C
 
 antioch_mixture_SOURCES = unit/antioch_mixture.C
 arrhenius_catalycity_SOURCES = unit/arrhenius_catalycity.C
@@ -156,6 +159,7 @@ elastic_sheet_regression_SOURCES = regression/elastic_sheet_regression.C
 3d_low_mach_jacobians_xz_SOURCES = regression/3d_low_mach_jacobians.C
 3d_low_mach_jacobians_yz_SOURCES = regression/3d_low_mach_jacobians.C
 generic_solution_regression_SOURCES = regression/generic_solution_regression.C
+regression_testing_app_SOURCES = regression/regression_testing_app.C
 
 # AMR test source files
 generic_amr_testing_app_SOURCES = amr/generic_amr_testing_app.C
@@ -259,6 +263,8 @@ TESTS += regression/backward_facing_step.sh
 TESTS += regression/locally_refine.sh
 TESTS += regression/penalty_poiseuille.sh
 TESTS += regression/penalty_poiseuille_stab.sh
+TESTS += regression/poisson_user_constraint.sh
+TESTS += regression/velocity_penalty_drag.sh
 TESTS += regression/redistribute.sh
 TESTS += regression/coupled_stokes_ns.sh
 TESTS += regression/hot_cylinder.sh

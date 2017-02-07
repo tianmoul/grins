@@ -31,6 +31,7 @@
 #include "grins/fe_variables_base.h"
 #include "grins/variable_warehouse.h"
 #include "grins/bc_builder.h"
+#include "grins/constraint_builder.h"
 
 // libMesh
 #include "libmesh/composite_function.h"
@@ -133,6 +134,11 @@ namespace GRINS
 
     libmesh_assert(_input);
     BCBuilder::build_boundary_conditions(*_input,*this,_neumann_bcs);
+
+    this->_constraint =
+      ConstraintBuilder::build_constraint_object(*_input,*this);
+
+    this->attach_constraint_object(*this->_constraint);
 
     // If any variables need custom numerical_jacobian_h, we can set those
     // values now that variable names are all registered with the System
@@ -243,7 +249,7 @@ namespace GRINS
 
   void MultiphysicsSystem::init_context( libMesh::DiffContext& context )
   {
-    AssemblyContext& c = libMesh::libmesh_cast_ref<AssemblyContext&>(context);
+    AssemblyContext& c = libMesh::cast_ref<AssemblyContext&>(context);
 
     //Loop over each physics to initialize relevant variable structures for assembling system
     for( PhysicsListIter physics_iter = _physics_list.begin();
@@ -287,7 +293,7 @@ namespace GRINS
                                               ResFuncType resfunc,
                                               CacheFuncType cachefunc)
   {
-    AssemblyContext& c = libMesh::libmesh_cast_ref<AssemblyContext&>(context);
+    AssemblyContext& c = libMesh::cast_ref<AssemblyContext&>(context);
 
     bool compute_jacobian = true;
     if( !request_jacobian || _use_numerical_jacobians_only ) compute_jacobian = false;
@@ -476,7 +482,7 @@ namespace GRINS
                                               libMesh::DiffContext& context )
   {
     AssemblyContext& assembly_context =
-      libMesh::libmesh_cast_ref<AssemblyContext&>( context );
+      libMesh::cast_ref<AssemblyContext&>( context );
 
     std::vector<BoundaryID> ids = assembly_context.side_boundary_ids();
 
