@@ -112,7 +112,7 @@ unit_driver_SOURCES = unit/unit_driver.C \
                       unit/default_bc_builder.C \
                       unit/rayfire_test.C \
                       unit/rayfireAMR_test.C \
-                      unit/overlapping_fluid_solid_mesh.C
+                      unit/overlapping_fluid_solid_mesh.C \
                       unit/integrated_function_test.C \
                       unit/hitran_test.C \
                       unit/spectroscopic_absorption_test.C
