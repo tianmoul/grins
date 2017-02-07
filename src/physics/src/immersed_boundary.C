@@ -211,6 +211,13 @@ namespace GRINS
   }
 
   template<typename SolidMech>
+  void ImmersedBoundary<SolidMech>::reinit( MultiphysicsSystem & system )
+  {
+    _point_locator.reset();
+    _point_locator = system.get_mesh().sub_point_locator();
+  }
+
+  template<typename SolidMech>
   void ImmersedBoundary<SolidMech>::element_time_derivative( bool compute_jacobian,
                                                              AssemblyContext & context,
                                                              CachedValues & /*cache*/ )

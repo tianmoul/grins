@@ -75,6 +75,9 @@ namespace GRINS
     //! Cache mesh information needed for residual computation
     virtual void preassembly( MultiphysicsSystem & system );
 
+    //! We need to reinit the point locator when libMesh::System::reinit is called.
+    virtual void reinit( MultiphysicsSystem & system );
+
     //! Override to point to solid Physics for displacement initial conditions
     /*! It would make sense for the user, under the current schema, to put the
         displacement initial conditions in the solid Physics part of the input
