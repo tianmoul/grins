@@ -482,7 +482,7 @@ namespace GRINS
               {
                 system.get_dof_map().constrain_element_matrix
                   ( K,
-                    _solid_context->get_dof_indices(),
+                    solid_dof_indices,
                     velocity_dof_indices,
                     false );
 
@@ -493,7 +493,8 @@ namespace GRINS
 
             system.get_dof_map().constrain_element_vector
                   ( _solid_context->get_elem_residual(),
-                    _solid_context->get_dof_indices(), false );
+                    solid_dof_indices,
+                    false );
 
             system.rhs->add_vector( solid_context.get_elem_residual(),
                                     solid_dof_indices );
