@@ -494,7 +494,7 @@ namespace GRINS
               }
 
             system.get_dof_map().constrain_element_vector
-                  ( _solid_context->get_elem_residual(),
+                  ( solid_context.get_elem_residual(),
                     solid_dof_indices,
                     false );
 
