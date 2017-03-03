@@ -287,8 +287,8 @@ namespace GRINS
              const std::vector<libMesh::Real> & solid_JxW =
                solid_context.get_element_fe(us_var,2)->get_JxW();
 
-            _solid_context->pre_fe_reinit(system,solid_elem);
-            _solid_context->elem_fe_reinit();
+            solid_context.pre_fe_reinit(system,solid_elem);
+            solid_context.elem_fe_reinit();
 
             const unsigned int n_solid_dofs =
               solid_context.get_dof_indices(us_var).size();
@@ -347,7 +347,9 @@ namespace GRINS
             if( us_var != u_dot_var )
               sshift = 2;
 
-            std::vector<libMesh::dof_id_type> solid_dof_indices(_disp_vars.dim()*sshift*n_solid_dofs);
+            std::vector<libMesh::dof_id_type> solid_dof_indices;
+            solid_dof_indices.reserve(_disp_vars.dim()*sshift*n_solid_dofs);
+
             std::vector<libMesh::dof_id_type>::iterator sdof_start = solid_dof_indices.begin();
             solid_dof_indices.insert( sdof_start,
                                       solid_context.get_dof_indices(us_var).begin(),
