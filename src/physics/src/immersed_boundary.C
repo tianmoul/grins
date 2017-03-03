@@ -53,6 +53,12 @@
 #include "libmesh/dof_map.h"
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/numeric_vector.h"
+#include "libmesh/petsc_matrix.h"
+#include "libmesh/petsc_macro.h"
+#include "libmesh/petsc_solver_exception.h"
+
+// PETSc includes
+# include <petscsnes.h>
 
 namespace GRINS
 {
@@ -221,6 +227,14 @@ namespace GRINS
     libmesh_assert(dof_map.is_attached(matrix));
     matrix.init();
     matrix.zero();
+
+    libMesh::PetscMatrix<libMesh::Number> & petsc_matrix = libMesh::cast_ref<libMesh::PetscMatrix<libMesh::Number> &>(matrix);
+
+    Mat A = petsc_matrix.mat();
+
+    PetscErrorCode ierr =0;
+    ierr = MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+    //LIBMESH_CHKERR(ierr);
   }
 
   template<typename SolidMech>
