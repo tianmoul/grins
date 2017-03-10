@@ -152,7 +152,7 @@ echo_physics = 'true'
 # Options related to the solver
 [linear-nonlinear-solver]
    max_nonlinear_iterations = '5'
-   use_numerical_jacobians_only = 'true'
+   use_numerical_jacobians_only = 'false'
    continue_after_max_iterations = 'true'
 
 []
